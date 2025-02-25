@@ -4,13 +4,10 @@ one sig Guitar {
     strings: pfunc Int -> String
 }
 
-abstract sig Interval {
+sig Interval {
     hs: one Int,
     next: one Interval
 }
-
-sig W extends Interval {}
-sig H extends Interval {}
 
 sig String {
     frets: pfunc Int -> Interval,
@@ -22,24 +19,35 @@ sig Start {
     offset: one Int
 }
 
-pred diatonic {
-  -- expected number of whole and half-steps
-    #W = 5
-    #H = 2  
-  -- Half steps are separated
-  -- We'll be able to express this much more consisely in Relational Forge,
-  -- but for now, let's stick to Froglet. "No half step's successor or twice 
-  -- successor is another half step"
-    all h1: H, h2: H | h1.next != h2 and h1.next.next != h2
-  
+pred tuned {
+    // Each string starts at a note
+    // TODO: note enum? eg. abstract sig Note {nextNote: one Note}
+                                        //one sig A, Bb, B, C, Cs, D, Ds, E, F, Fs, G, Gs extends Note {}
+    all s: String | some s.stringStart
+
+    // Intervals are cyclic for the specified note domain
+    all s: String, i: Int, f: Interval | {
+        s.frets[i] = f and i >= 1 and i < 7 and some s.frets[add[i,1]] =>
+            f.next = s.frets[add[i,1]]
+    }
+
+    // Intervals are on one united cycle
+    all i1, i2: Interval | {
+        i1 != i2 => reachable[i2, i1, next]
+    }
+
+    // strings shouldn't start on the same note
+    // MODIFY: string.fret[7].next = next string.stringStart note
+    all s1, s2: String | s1 != s2 => s1.stringStart.start != s2.stringStart.start
+
 }
 
 pred wellformed {
     // Guitars must have exactly 6 strings
     #Guitar.strings = 6
 
-    // All strings must have 12 frets
-    all s: String | #s.frets = 12
+    // All strings must have 7 frets
+    all s: String | #s.frets = 7
 
     // Strings mapping logic
     all i: Int {
@@ -55,19 +63,18 @@ pred wellformed {
             (i != j) and some Guitar.strings[i] and some Guitar.strings[j] => (Guitar.strings[i] != Guitar.strings[j])
         }
     }
-    
+
     // Fret mapping logic
     all s: String, f: Int | {
-        // No frets at post < 1 or > 12
-        some s.frets[f] => f >= 1 and f <= 12
+        // No frets at post < 1 or > 7
+        some s.frets[f] => f >= 1 and f <= 7
 
-        // All positions between [1, 12] have frets
-        f >= 1 and f <= 12 => some s.frets[f]
+        // All positions between [1, 7] have frets
+        f >= 1 and f <= 7 => some s.frets[f]
     }
 }
 
-
 wellformedRun: run {
     wellformed
-    diatonic
-} for 1 Guitar, 7 Interval, 5 Int, 2 H, 7 W, 6 String, 6 Start
+    tuned
+} for 1 Guitar, 42 Interval, 7 Int, 6 String, 6 Start
