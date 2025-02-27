@@ -11,7 +11,13 @@ sig Interval {
 
 sig String {
     frets: pfunc Int -> Interval,
-    stringStart: one Interval
+    stringStart: one Interval,
+    stringPos: one Int // for visualizer, cleaner
+}
+
+sig PlayedNote {
+    string: one String,
+    fret: one Int
 }
 
 // pred diatonic {
@@ -57,8 +63,16 @@ pred wellformed {
         all i, j: Int | {
             j = add[i, 1] and i >= 1 and i <= 11 => next[s.frets[i]] = s.frets[j]
         }
+
+        Guitar.strings[f] = s => s.stringPos = f
     }
 }
+
+// pred validNote {
+//     all p: PlayedNote, s: String, f: Int | {
+//         p.string = s and p.fret = f => s.frets[f] = p.string.stringStart
+//     }
+// }
 
 pred westernInterval {
     #Interval = 12
@@ -106,4 +120,4 @@ wellformedRun: run {
     wellformed
     westernInterval
     standardTuning
-} for 1 Guitar, 5 Int, exactly 12 Interval, 6 String
+} for 1 Guitar, 5 Int, exactly 12 Interval, 6 String, 3 PlayedNote
