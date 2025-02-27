@@ -22,3 +22,5 @@ These design choices can be seen on the neck of a guitar in our custom visualiza
 - **StandardTuning Predicate**: Ensures that the string-to-interval mappings align with standard guitar tuning (e.g., EADGBE). A major 3rd is programmed between strings 3 and 4, where the 4th half step on string 3 loops back to be the starting note of string 4, and similarly a perfect 5th, or 5 half steps, are programmed between the rest of the string pairs. 
 
 ## Testing
+
+We wrote several tests for the model itself, including ones for wellformedness which ensure a basic guitar has the correct number of strings, intervals, and valid fret mappings, Western Interval tests to ensure that intervals are sequential and wrap around in a 12-step cycle, as well as tests which verify the tuning of open string notes. We also tested domain area properties such as valid mappings between guitar strings, frets, and intervals, that played notes correspond to valid string/fret combinations, and that all the predicates are satisfied by instances in the test suite. 
