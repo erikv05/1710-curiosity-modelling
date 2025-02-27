@@ -20,15 +20,6 @@ sig PlayedNote {
     fret: one Int
 }
 
-// pred diatonic {
-//     // # of steps between each interval
-//     #W = 5
-//     #H = 2  
-//     // next of half step can't be half step
-//     all h1: H, h2: H | h1.next != h2 and h1.next.next != h2
-  
-// }
-
 pred wellformed {
     // Guitars must have exactly 6 strings
     #Guitar.strings = 6
@@ -95,24 +86,24 @@ pred standardTuning {
     // Start rules
     all s: String | one s.stringStart
     
-    // Ensure interval between strings (perfect 4th and major 3rd)
-    all s1, s2: String | {
-        // Find the strings' numeric positions
-        all i, j: Int | {
-            Guitar.strings[i] = s1 and Guitar.strings[j] = s2 and add[i, 1] = j => {
-                // Major 3rd between 2nd and 3rd strings (4 half steps)
-                i = 2 => {
-                    let s1Int = s1.stringStart,
-                        s2Int = s2.stringStart |
-                        s1Int.next.next.next.next = s2Int
-                } else {
-                    // Perfect 4th (5 half steps) between all other adjacent strings
-                    let s1Int = s1.stringStart,
-                        s2Int = s2.stringStart |
-                        s1Int.next.next.next.next.next = s2Int
+    // Intervals between strings (perfect 4ths and major 3rds) 
+    all i: Int | {
+       (i >= 1 and i < 6) => {
+            let s1 = Guitar.strings[i], 
+                s2 = Guitar.strings[add[i, 1]] | {
+                    i = 3 => {
+                        // Major 3rd between G and B strings (strings 3 and 4)
+                        let s1Int = s1.stringStart,
+                            s2Int = s2.stringStart |
+                            s1Int.next.next.next.next = s2Int
+                    } else {
+                        // Perfect 4th (5 half steps) between all other adjacent strings
+                        let s1Int = s1.stringStart,
+                            s2Int = s2.stringStart |
+                            s1Int.next.next.next.next.next = s2Int
+                    }
                 }
-            }
-        }
+       }
     }
 }
 
