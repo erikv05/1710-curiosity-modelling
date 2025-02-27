@@ -23,13 +23,10 @@ sig Start {
 }
 
 pred diatonic {
-  -- expected number of whole and half-steps
+    // # of steps between each interval
     #W = 5
     #H = 2  
-  -- Half steps are separated
-  -- We'll be able to express this much more consisely in Relational Forge,
-  -- but for now, let's stick to Froglet. "No half step's successor or twice 
-  -- successor is another half step"
+    // next of half step can't be half step
     all h1: H, h2: H | h1.next != h2 and h1.next.next != h2
   
 }
@@ -37,6 +34,10 @@ pred diatonic {
 pred wellformed {
     // Guitars must have exactly 6 strings
     #Guitar.strings = 6
+
+    // For visualization
+    all s: W | s.hs = 2
+    all s: H | s.hs = 1
 
     // All strings must have 12 frets
     all s: String | #s.frets = 12
@@ -64,6 +65,11 @@ pred wellformed {
         // All positions between [1, 12] have frets
         f >= 1 and f <= 12 => some s.frets[f]
     }
+
+    // Interval rules
+    (sum s: Interval | s.hs) = 12
+    all s1, s2: Interval | reachable[s1, s2, next]
+    all s: Interval | one next[s]
 }
 
 
