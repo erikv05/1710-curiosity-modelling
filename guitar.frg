@@ -4,40 +4,29 @@ one sig Guitar {
     strings: pfunc Int -> String
 }
 
-abstract sig Interval {
-    hs: one Int,
-    next: one Interval
+sig Interval {
+    pos: one Int,
+    next: one Interval,
+    octave: one Int
 }
-
-sig W extends Interval {}
-sig H extends Interval {}
 
 sig String {
     frets: pfunc Int -> Interval,
-    stringStart: one Start
+    stringStart: one Interval
 }
 
-sig Start {
-    start: one Interval,
-    offset: one Int
-}
-
-pred diatonic {
-    // # of steps between each interval
-    #W = 5
-    #H = 2  
-    // next of half step can't be half step
-    all h1: H, h2: H | h1.next != h2 and h1.next.next != h2
+// pred diatonic {
+//     // # of steps between each interval
+//     #W = 5
+//     #H = 2  
+//     // next of half step can't be half step
+//     all h1: H, h2: H | h1.next != h2 and h1.next.next != h2
   
-}
+// }
 
 pred wellformed {
     // Guitars must have exactly 6 strings
     #Guitar.strings = 6
-
-    // For visualization
-    all s: W | s.hs = 2
-    all s: H | s.hs = 1
 
     // All strings must have 12 frets
     all s: String | #s.frets = 12
@@ -64,14 +53,26 @@ pred wellformed {
 
         // All positions between [1, 12] have frets
         f >= 1 and f <= 12 => some s.frets[f]
+
+        // Ensure fret map to next interval corretly
+        all i, j: Int | {
+            j = add[i, 1] and i >= 1 and i <= 11 => next[s.frets[i]] = s.frets[j]
+        }
     }
+}
 
-    // Interval rules
-    (sum s: Interval | s.hs) = 12
-    all s1, s2: Interval | reachable[s1, s2, next]
-    all s: Interval | one next[s]
-
-
+pred westernInterval {
+    #Interval = 12
+    all s: Interval | {
+        one next[s] // Must have next
+        s.pos >= 1 and s.pos <= 12 // Must be in range [1, 12]
+    }     
+    
+    all disj s1, s2: Interval | {
+        s1.pos != s2.pos
+        add[s1.pos, 1] = s2.pos => next[s1] = s2
+        s1.pos = 12 and s2.pos = 1 => next[s1] = s2
+    }
 }
 
 // Ensures standard tuning for a 6-string guitar
@@ -79,26 +80,22 @@ pred wellformed {
 pred standardTuning {
     // Start rules
     all s: String | one s.stringStart
+    
     // Ensure interval between strings (perfect 4th and major 3rd)
     all s1, s2: String | {
         // Find the strings' numeric positions
         some i, j: Int | {
             Guitar.strings[i] = s1 and Guitar.strings[j] = s2 and add[i, 1] = j => {
-                // Major 3rd between 2nd and 3rd strings
+                // Major 3rd between 2nd and 3rd strings (4 half steps)
                 i = 2 => {
-                    // Major 3rd is 4 half steps
-                    let s1Start = s1.stringStart.start, 
-                            s2Start = s2.stringStart.start,
-                            s1Off = s1.stringStart.offset,
-                            s2Off = s2.stringStart.offset |
-                            (remainder[(add[#s1Off, s1Start, #s2Start, 4]), 12]) = s2Off
+                    let s1Int = s1.stringStart,
+                        s2Int = s2.stringStart |
+                        s1Int.next.next.next.next = s2Int
                 } else {
                     // Perfect 4th (5 half steps) between all other adjacent strings
-                    let s1Start = s1.stringStart.start, 
-                            s2Start = s2.stringStart.start,
-                            s1Off = s1.stringStart.offset,
-                            s2Off = s2.stringStart.offset |
-                            (remainder[(add[s1Off, #s1Start, #s2Start, 5]), 12]) = s2Off
+                    let s1Int = s1.stringStart,
+                        s2Int = s2.stringStart |
+                        s1Int.next.next.next.next.next = s2Int
                 }
             }
         }
@@ -107,6 +104,6 @@ pred standardTuning {
 
 wellformedRun: run {
     wellformed
+    westernInterval
     standardTuning
-    diatonic
-} for 1 Guitar, 7 Interval, 5 Int, 2 H, 7 W, 6 String, 6 Start
+} for 1 Guitar, exactly 12 Interval, 5 Int, 6 String

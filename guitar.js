@@ -48,7 +48,7 @@ function getNoteAtPosition(stringIdx, fret) {
  * @return {boolean} True if half step, false otherwise
  */
 function isHalfStep(interval) {
-  return interval.hs._id === 1;
+    return interval.hs._id == 1;
 }
 
 /**
@@ -77,14 +77,35 @@ function getIntervalLabel(interval) {
   }
 }
 
+/**
+ * Calculates the tuning for each string based on intervals from the model
+ * @param {Object[]} strings - Array of String objects from the Forge model
+ * @return {number[]} Array of note indices for each string
+ */
+function calculateStringTuning(strings) {
+  // Start with the lowest string (E)
+  const tuning = [4]; // E note index
+  
+  // Calculate each subsequent string based on intervals
+  // Perfect fourth is 5 half steps, Major third is 4 half steps
+  for (let i = 1; i < 6; i++) {
+    const interval = (i === 2) ? 4 : 5; // Major third between strings 2-3, Perfect fourth elsewhere
+    const prevString = tuning[i-1];
+    tuning.push((prevString + interval) % 12);
+  }
+  
+  return tuning;
+}
+
 /*
  * DRAWING FUNCTIONS
  */
 
 /**
  * Draws the guitar fretboard
+ * @param {number[]} tuning - Array of note indices for each string
  */
-function drawFretboard() {
+function drawFretboard(tuning) {
   // Draw fretboard background
   d3.select(svg)
     .append("rect")
@@ -150,7 +171,7 @@ function drawFretboard() {
     }
   }
 
-  // Draw strings
+  // Draw strings with calculated tuning
   for (let i = 0; i < STRING_COUNT; i++) {
     const y = FRETBOARD_TOP + i * STRING_SPACING;
     
@@ -163,8 +184,8 @@ function drawFretboard() {
       .attr("stroke", "#aaa")
       .attr("stroke-width", 2 + (STRING_COUNT - i) * 0.4);
       
-    // String name/note
-    const stringNote = NOTES[STANDARD_TUNING[i]];
+    // String name/note based on calculated tuning
+    const stringNote = NOTES[tuning[i]];
     d3.select(svg)
       .append("text")
       .attr("x", FRETBOARD_LEFT - 20)
@@ -172,6 +193,27 @@ function drawFretboard() {
       .attr("text-anchor", "middle")
       .text(stringNote);
   }
+  
+  // Draw a legend explaining the string tuning intervals
+  const legend = d3.select(svg)
+    .append("g")
+    .attr("transform", `translate(${FRETBOARD_LEFT}, ${FRETBOARD_TOP - 80})`);
+    
+  legend.append("text")
+    .attr("x", 0)
+    .attr("y", 0)
+    .attr("font-weight", "bold")
+    .text("String Tuning:");
+    
+  legend.append("text")
+    .attr("x", 0)
+    .attr("y", 20)
+    .text("Perfect 4th between all strings (5 half steps)");
+    
+  legend.append("text")
+    .attr("x", 0)
+    .attr("y", 40)
+    .text("except Major 3rd between strings 2-3 (4 half steps)");
 }
 
 /**
@@ -290,7 +332,6 @@ function displayModelSummary(strings) {
     
     for (let fret = 1; fret <= 12; fret++) {
       const interval = string.frets[fret.toString()];
-      if (!interval) continue;
       
       if (!isHalfStep(interval)) wholeSteps++;
       else if (isHalfStep(interval)) halfSteps++;
@@ -331,49 +372,8 @@ function displayModelSummary(strings) {
 }
 
 /**
- * Find an interval path traversing the strings
- * @param {Object[]} strings - Array of String objects from the Forge model
- */
-function findScalePath(strings) {
-  // This function would trace a path through the intervals
-  // to highlight a scale pattern across the strings
-  
-  // For this simplified version, we'll just highlight one scale per string
-  for (const string of strings) {
-    // Get the start interval for this string
-    const startInterval = string.stringStart.start;
-    let nextInterval = startInterval;
-    let intervalPath = [];
-    
-    // Follow the 'next' relationship to build a scale path (up to 7 intervals)
-    for (let i = 0; i < 7 && nextInterval; i++) {
-      intervalPath.push(nextInterval);
-      nextInterval = nextInterval.next;
-      
-      // Break if we've come back to the start
-      if (nextInterval === startInterval) break;
-    }
-    
-    // Now find which frets these intervals are on
-    const fretPositions = [];
-    for (const interval of intervalPath) {
-      for (let fret = 1; fret <= 12; fret++) {
-        if (string.frets[fret.toString()] === interval) {
-          fretPositions.push(fret);
-          break;
-        }
-      }
-    }
-    
-    // We could highlight these frets with a different color or draw lines between them
-    // but we'll leave that for a more advanced visualization
-  }
-}
-
-/*
  * Main viz function
  */
-
 function visualizeGuitar() {
   // Make sure the SVG is sized appropriately
   d3.select(svg)
@@ -383,8 +383,11 @@ function visualizeGuitar() {
   // Get all the strings from the model
   const strings = String.atoms(true);
   
-  // Draw the basic fretboard
-  drawFretboard();
+  // Calculate string tuning based on intervals
+  const tuning = calculateStringTuning(strings);
+  
+  // Draw the basic fretboard with the calculated tuning
+  drawFretboard(tuning);
   
   // Draw the intervals on the fretboard
   drawIntervals(strings);
