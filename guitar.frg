@@ -71,13 +71,19 @@ pred wellformed {
     all s1, s2: Interval | reachable[s1, s2, next]
     all s: Interval | one next[s]
 
+
+}
+
+// Ensures standard tuning for a 6-string guitar
+// We could experiment with different tunings later
+pred standardTuning {
     // Start rules
     all s: String | one s.stringStart
     // Ensure interval between strings (perfect 4th and major 3rd)
     all s1, s2: String | {
         // Find the strings' numeric positions
         some i, j: Int | {
-            Guitar.strings[i] = s1 and Guitar.strings[j] = s2 and i+1 = j => {
+            Guitar.strings[i] = s1 and Guitar.strings[j] = s2 and add[i, 1] = j => {
                 // Major 3rd between 2nd and 3rd strings
                 i = 2 => {
                     // Major 3rd is 4 half steps
@@ -85,23 +91,22 @@ pred wellformed {
                             s2Start = s2.stringStart.start,
                             s1Off = s1.stringStart.offset,
                             s2Off = s2.stringStart.offset |
-                            ((s1Off + sum[s1Start, s2Start] + 4) % 12) = s2Off
+                            (remainder[(add[#s1Off, s1Start, #s2Start, 4]), 12]) = s2Off
                 } else {
                     // Perfect 4th (5 half steps) between all other adjacent strings
                     let s1Start = s1.stringStart.start, 
                             s2Start = s2.stringStart.start,
                             s1Off = s1.stringStart.offset,
                             s2Off = s2.stringStart.offset |
-                            ((s1Off + sum[s1Start, s2Start] + 5) % 12) = s2Off
+                            (remainder[(add[s1Off, #s1Start, #s2Start, 5]), 12]) = s2Off
                 }
             }
         }
     }
-
 }
-
 
 wellformedRun: run {
     wellformed
+    standardTuning
     diatonic
 } for 1 Guitar, 7 Interval, 5 Int, 2 H, 7 W, 6 String, 6 Start
