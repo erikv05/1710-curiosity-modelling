@@ -70,6 +70,34 @@ pred wellformed {
     (sum s: Interval | s.hs) = 12
     all s1, s2: Interval | reachable[s1, s2, next]
     all s: Interval | one next[s]
+
+    // Start rules
+    all s: String | one s.stringStart
+    // Ensure interval between strings (perfect 4th and major 3rd)
+    all s1, s2: String | {
+        // Find the strings' numeric positions
+        some i, j: Int | {
+            Guitar.strings[i] = s1 and Guitar.strings[j] = s2 and i+1 = j => {
+                // Major 3rd between 2nd and 3rd strings
+                i = 2 => {
+                    // Major 3rd is 4 half steps
+                    let s1Start = s1.stringStart.start, 
+                            s2Start = s2.stringStart.start,
+                            s1Off = s1.stringStart.offset,
+                            s2Off = s2.stringStart.offset |
+                            ((s1Off + sum[s1Start, s2Start] + 4) % 12) = s2Off
+                } else {
+                    // Perfect 4th (5 half steps) between all other adjacent strings
+                    let s1Start = s1.stringStart.start, 
+                            s2Start = s2.stringStart.start,
+                            s1Off = s1.stringStart.offset,
+                            s2Off = s2.stringStart.offset |
+                            ((s1Off + sum[s1Start, s2Start] + 5) % 12) = s2Off
+                }
+            }
+        }
+    }
+
 }
 
 
