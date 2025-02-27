@@ -6,8 +6,7 @@ one sig Guitar {
 
 sig Interval {
     pos: one Int,
-    next: one Interval,
-    octave: one Int
+    next: one Interval
 }
 
 sig String {
@@ -73,6 +72,7 @@ pred westernInterval {
         add[s1.pos, 1] = s2.pos => next[s1] = s2
         s1.pos = 12 and s2.pos = 1 => next[s1] = s2
     }
+
 }
 
 // Ensures standard tuning for a 6-string guitar
@@ -84,7 +84,7 @@ pred standardTuning {
     // Ensure interval between strings (perfect 4th and major 3rd)
     all s1, s2: String | {
         // Find the strings' numeric positions
-        some i, j: Int | {
+        all i, j: Int | {
             Guitar.strings[i] = s1 and Guitar.strings[j] = s2 and add[i, 1] = j => {
                 // Major 3rd between 2nd and 3rd strings (4 half steps)
                 i = 2 => {
@@ -106,4 +106,4 @@ wellformedRun: run {
     wellformed
     westernInterval
     standardTuning
-} for 1 Guitar, exactly 12 Interval, 5 Int, 6 String
+} for 1 Guitar, 5 Int, exactly 12 Interval, 6 String
