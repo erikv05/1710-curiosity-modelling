@@ -297,6 +297,7 @@ function visualizeGuitar() {
   let strings = String.atoms(true);
   const playedNotes = PlayedNote.atoms(true);
   
+  
   // Sort strings in ascending order so that string 1 (E4) is at the top and string 6 (E2) is at the bottom
   strings = [...strings].sort((a, b) => a.stringPos._id - b.stringPos._id);
   
