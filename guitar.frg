@@ -59,11 +59,16 @@ pred wellformed {
     }
 }
 
-// pred validNote {
-//     all p: PlayedNote, s: String, f: Int | {
-//         p.string = s and p.fret = f => s.frets[f] = p.string.stringStart
-//     }
-// }
+pred validNote {
+    all p: PlayedNote, s: String, f: Int | {
+        p.string = s and p.fret = f => s.frets[f] = p.string.stringStart
+    }
+
+    all disj p1, p2: PlayedNote | {
+        p1.string != p2.string
+        p1.fret != p2.fret
+    }
+}
 
 pred westernInterval {
     #Interval = 12
@@ -87,23 +92,10 @@ pred standardTuning {
     all s: String | one s.stringStart
     
     // Intervals between strings (perfect 4ths and major 3rds) 
-    all i: Int | {
-       (i >= 1 and i < 6) => {
-            let s1 = Guitar.strings[i], 
-                s2 = Guitar.strings[add[i, 1]] | {
-                    i = 3 => {
-                        // Major 3rd between G and B strings (strings 3 and 4)
-                        let s1Int = s1.stringStart,
-                            s2Int = s2.stringStart |
-                            s1Int.next.next.next.next = s2Int
-                    } else {
-                        // Perfect 4th (5 half steps) between all other adjacent strings
-                        let s1Int = s1.stringStart,
-                            s2Int = s2.stringStart |
-                            s1Int.next.next.next.next.next = s2Int
-                    }
-                }
-       }
+    all s1, s2: String | {
+        add[s1.stringPos, 1] = s2.stringPos => {
+            s1.stringPos = 2 => s1.stringStart.next.next.next.next = s2.stringStart else s1.stringStart.next.next.next.next.next = s2.stringStart
+        }
     }
 }
 
@@ -111,4 +103,5 @@ wellformedRun: run {
     wellformed
     westernInterval
     standardTuning
+    validNote
 } for 1 Guitar, 5 Int, exactly 12 Interval, 6 String, 3 PlayedNote

@@ -1,9 +1,10 @@
-require('d3')
-require('tone')
+require('d3');
+require('tone');
 
 // clear the svg
 d3.selectAll("svg > *").remove();
-// set up tone synth
+
+// set up Tone synth
 const synth = new tone.Synth().toDestination();
 
 /*
@@ -19,44 +20,56 @@ const STRING_COUNT = 6;
 const FRET_COUNT = 12;
 const STRING_SPACING = FRETBOARD_HEIGHT / (STRING_COUNT - 1);
 const FRET_SPACING = FRETBOARD_WIDTH / FRET_COUNT;
-const FRET_MARKER_POSITIONS = [3, 5, 7, 9, 12]; // Frets that typically have markers
+const FRET_MARKER_POSITIONS = [3, 5, 7, 9, 12];
 const NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 /*
- * Music helpers
+ * Standard tuning mapping.
+ * We assume that each String object has a property "stringPos._id" such that:
+ *   stringPos 6 => Low E (E2)
+ *   stringPos 5 => A2
+ *   stringPos 4 => D3
+ *   stringPos 3 => G3
+ *   stringPos 2 => B3
+ *   stringPos 1 => High E (E4)
+ *
+ * When drawing the fretboard we sort in ascending order so that the highest pitch (E4)
+ * is at the top and the lowest pitch (E2) is at the bottom.
  */
-
-/**
- * Converts a note index (0-11) to a note name
- * @param {number} index - Note index from 0 (C) to 11 (B)
- * @return {string} Note name
- */
-function indexToNote(index) {
-  return NOTES[index % 12];
+function getOpenStringNote(string) {
+  const tuning = {
+    6: "E2",
+    5: "A2",
+    4: "D3",
+    3: "G3",
+    2: "B3",
+    1: "E4"
+  };
+  return tuning[string.stringPos._id] || "E4";
 }
 
-/**
- * Gets note name and octave at a specific fret position
- * @param {number} startNoteIndex - Index of the open string note
- * @param {number} fret - Fret number
- * @param {number} stringIndex - String index (1-based, from top to bottom)
- * @return {string} Note name with octave
+/*
+ * Given an open note (e.g. "E4") and a fret number, compute the note at that fret.
  */
-function getNoteAtPosition(startNoteIndex, fret, stringIndex) {
-  const noteIndex = (startNoteIndex + fret) % 12;
-  // Calculate octave (approximation)
-  const baseOctave = 2 + Math.floor((6 - stringIndex) / 2);
-  const octaveShift = Math.floor((startNoteIndex + fret) / 12);
-  return NOTES[noteIndex] + (baseOctave + octaveShift);
+function getNoteAtFret(openNote, fret) {
+  const noteRegex = /^([A-G]#?)(\d)$/;
+  const match = openNote.match(noteRegex);
+  if (!match) return openNote;
+  const openLetter = match[1];
+  const openOctave = parseInt(match[2]);
+  const openIndex = NOTES.indexOf(openLetter);
+  const totalSemitones = openIndex + fret;
+  const noteIndex = totalSemitones % 12;
+  const octaveShift = Math.floor(totalSemitones / 12);
+  return NOTES[noteIndex] + (openOctave + octaveShift);
 }
 
-/**
- * Draws the guitar fretboard
- * @param {Object[]} strings - Array of String objects from the Forge model
+/*
+ * Draws the guitar fretboard background, frets, markers, and string labels.
  */
 function drawFretboard(strings) {
-  // Draw fretboard background
-  d3.select(svg)
+  // Draw the fretboard background
+  d3.select("svg")
     .append("rect")
     .attr("x", FRETBOARD_LEFT)
     .attr("y", FRETBOARD_TOP)
@@ -65,25 +78,21 @@ function drawFretboard(strings) {
     .attr("fill", "#d5a06e")
     .attr("stroke", "black");
 
-  // Draw frets
+  // Draw frets and fret numbers
   for (let i = 0; i <= FRET_COUNT; i++) {
     const x = FRETBOARD_LEFT + i * FRET_SPACING;
-    
-    // Draw fret line (except for "nut" at position 0)
     if (i > 0) {
-      d3.select(svg)
+      d3.select("svg")
         .append("line")
         .attr("x1", x)
         .attr("y1", FRETBOARD_TOP)
         .attr("x2", x)
         .attr("y2", FRETBOARD_TOP + FRETBOARD_HEIGHT)
         .attr("stroke", "#888")
-        .attr("stroke-width", i === 0 ? 5 : 2);
+        .attr("stroke-width", 2);
     }
-    
-    // Draw fret number
     if (i > 0) {
-      d3.select(svg)
+      d3.select("svg")
         .append("text")
         .attr("x", FRETBOARD_LEFT + (i - 0.5) * FRET_SPACING)
         .attr("y", FRETBOARD_TOP + FRETBOARD_HEIGHT + 30)
@@ -91,29 +100,27 @@ function drawFretboard(strings) {
         .text(i);
     }
   }
-  
-  // Draw fret markers
+
+  // Draw fret markers (dots)
   for (const pos of FRET_MARKER_POSITIONS) {
     const x = FRETBOARD_LEFT + (pos - 0.5) * FRET_SPACING;
     const y = FRETBOARD_TOP + FRETBOARD_HEIGHT / 2;
-    
-    // For the 12th fret, draw double dots
     if (pos === 12) {
-      d3.select(svg)
+      // 12th fret gets two dots
+      d3.select("svg")
         .append("circle")
         .attr("cx", x)
         .attr("cy", y - 30)
         .attr("r", 8)
         .attr("fill", "#ccc");
-        
-      d3.select(svg)
+      d3.select("svg")
         .append("circle")
         .attr("cx", x)
         .attr("cy", y + 30)
         .attr("r", 8)
         .attr("fill", "#ccc");
     } else {
-      d3.select(svg)
+      d3.select("svg")
         .append("circle")
         .attr("cx", x)
         .attr("cy", y)
@@ -122,12 +129,13 @@ function drawFretboard(strings) {
     }
   }
 
-  // Draw strings with open string notes
-  for (let i = 0; i < strings.length; i++) {
-    const stringIndex = i + 1;
+  // Sort strings in ascending order so that string 1 (E4) is at the top and string 6 (E2) is at the bottom
+  const sortedStrings = [...strings].sort((a, b) => a.stringPos._id - b.stringPos._id);
+  
+  // Draw each string line and label it with its open note
+  sortedStrings.forEach((string, i) => {
     const y = FRETBOARD_TOP + i * STRING_SPACING;
-    
-    d3.select(svg)
+    d3.select("svg")
       .append("line")
       .attr("x1", FRETBOARD_LEFT)
       .attr("y1", y)
@@ -135,24 +143,19 @@ function drawFretboard(strings) {
       .attr("y2", y)
       .attr("stroke", "#aaa")
       .attr("stroke-width", 2 + (STRING_COUNT - i) * 0.4);
-    
-    // Get the starting note position for this string
-    const string = strings[i];
-    const openStringInterval = string.stringStart;
-    const openStringNote = getOpenStringNote(openStringInterval, stringIndex); // Added stringIndex parameter
-    
-    // String name/note label for open string
-    d3.select(svg)
+      
+    const openNote = getOpenStringNote(string);
+    d3.select("svg")
       .append("text")
       .attr("x", FRETBOARD_LEFT - 20)
       .attr("y", y + 5)
-      .attr("text-anchor", "middle")
+      .attr("text-anchor", "end")
       .attr("font-weight", "bold")
-      .text(openStringNote);
-  }
-  
-  // Draw tuning legend
-  const legend = d3.select(svg)
+      .text(openNote);
+  });
+
+  // Tuning legend
+  const legend = d3.select("svg")
     .append("g")
     .attr("transform", `translate(${FRETBOARD_LEFT}, ${FRETBOARD_TOP - 80})`);
     
@@ -160,39 +163,14 @@ function drawFretboard(strings) {
     .attr("x", 0)
     .attr("y", 0)
     .attr("font-weight", "bold")
-    .text("Guitar String Tuning:");
-    
-  legend.append("text")
-    .attr("x", 0)
-    .attr("y", 20)
-    .text("Perfect 4th between all strings (5 half steps)");
-    
-  legend.append("text")
-    .attr("x", 0)
-    .attr("y", 40)
-    .text("except Major 3rd between strings 3-2 (4 half steps)");
+    .text("Guitar String Tuning (Standard): E2, A2, D3, G3, B3, E4");
 }
 
-/**
- * Determines the open string note based on the interval
- * @param {Object} interval - Starting interval for the string
- * @param {number} stringIndex - The 1-based index of the string
- * @return {string} Note name
- */
-function getOpenStringNote(interval, stringIndex) {
-  const openStringPos = interval.pos._id;
-  const openNoteIndex = openStringPos - 1;
-  const baseOctave = 2 + Math.floor((6 - stringIndex) / 2);
-  return NOTES[openNoteIndex % 12] + baseOctave;
-}
-
-
-/**
- * Draws playable frets on the fretboard
- * @param {Object[]} strings - Array of String objects from the Forge model
+/*
+ * Draws the playable fret markers and adds click handlers to play notes.
  */
 function drawPlayableFrets(strings, playedNotes) {
-  // Create a lookup map for played notes to efficiently check if a note is played
+  // Create a lookup for played notes for quick checking
   const playedNoteMap = {};
   playedNotes.forEach(note => {
     const stringId = note.string._id;
@@ -203,79 +181,75 @@ function drawPlayableFrets(strings, playedNotes) {
     playedNoteMap[stringId].push(fretNum);
   });
   
-  // Store all played notes for the play button
+  // Gather played note names for the "Play Notes" button
   const playedNotesToPlay = [];
   
-  // For each string in the model
-  for (let i = 0; i < strings.length; i++) {
-    const string = strings[i];
-    const stringIndex = i + 1; // 1-based index for the string
-    const y = FRETBOARD_TOP + i * STRING_SPACING; // Y position for the string
+  // Sort strings in ascending order so that string 1 (E4) is at the top and string 6 (E2) is at the bottom
+  const sortedStrings = [...strings].sort((a, b) => a.stringPos._id - b.stringPos._id);
+  
+  sortedStrings.forEach((string, i) => {
+    const y = FRETBOARD_TOP + i * STRING_SPACING;
+    const openNote = getOpenStringNote(string);
     
-    // Get the starting note for this string
-    const openStringInterval = string.stringStart;
-    const openStringPos = openStringInterval.pos._id;
-    const openNoteIndex = openStringPos - 1; // Assuming interval positions are 1-based
-    
-    // For each fret (including open string at position 0)
-    for (let fret = 0; fret <= 12; fret++) {
-      const x = FRETBOARD_LEFT + fret * FRET_SPACING - (fret === 0 ? FRET_SPACING/2 : 0);
+    for (let fret = 0; fret <= FRET_COUNT; fret++) {
+      // Compute x position; for open string (fret 0) we adjust so it sits left of the fretboard
+      let x;
+      if (fret === 0) {
+        x = FRETBOARD_LEFT - 40;
+      } else {
+        x = FRETBOARD_LEFT + fret * FRET_SPACING - FRET_SPACING / 2;
+      }
       
-      // Calculate the note at this fret position
-      const noteAtFret = getNoteAtPosition(openNoteIndex, fret, stringIndex);
+      // Determine the note at this fret
+      const noteAtFret = getNoteAtFret(openNote, fret);
       
-      // Check if this note is being played in the model
+      // Check if this note is marked as played in the model
       const isPlayed = playedNoteMap[string._id] && playedNoteMap[string._id].includes(fret);
-      
       if (isPlayed) {
         playedNotesToPlay.push(noteAtFret);
       }
       
-      if (fret > 0) { // Don't draw circle for open string (fret 0)
-        // Draw playable note marker
-        d3.select(svg)
+      if (fret > 0) {
+        // For fretted notes, draw a circle marker
+        d3.select("svg")
           .append("circle")
-          .attr("cx", x - (fret === 0 ? 0 : FRET_SPACING/2))
+          .attr("cx", x)
           .attr("cy", y)
           .attr("r", 10)
-          .attr("fill", isPlayed ? "#e74c3c" : "#2980b9") // Red for played notes, blue for others
+          .attr("fill", isPlayed ? "#e74c3c" : "#2980b9")
           .attr("stroke", "black")
-          .attr("stroke-width", isPlayed ? 2 : 1) // Thicker stroke for played notes
+          .attr("stroke-width", isPlayed ? 2 : 1)
           .attr("cursor", "pointer")
-          .attr("opacity", isPlayed ? 1.0 : 0.7) // Full opacity for played notes
+          .attr("opacity", isPlayed ? 1.0 : 0.7)
           .on("click", () => {
-            // Play the note when clicked
             synth.triggerAttackRelease(noteAtFret, "8n");
           })
           .append("title")
           .text(`Note: ${noteAtFret}${isPlayed ? " (Played in model)" : ""}`);
       } else {
-        // For open string, just add click handler to the string label area
-        d3.select(svg)
+        // For the open string, add a clickable rectangle
+        d3.select("svg")
           .append("rect")
-          .attr("x", FRETBOARD_LEFT - 40)
+          .attr("x", x)
           .attr("y", y - 10)
           .attr("width", 40)
           .attr("height", 20)
-          .attr("fill", isPlayed ? "rgba(231, 76, 60, 0.3)" : "transparent") // Light red background if played
+          .attr("fill", isPlayed ? "rgba(231, 76, 60, 0.3)" : "transparent")
           .attr("cursor", "pointer")
           .on("click", () => {
-            // Play the open string note when clicked
             synth.triggerAttackRelease(noteAtFret, "8n");
           })
           .append("title")
           .text(`Open string: ${noteAtFret}${isPlayed ? " (Played in model)" : ""}`);
       }
     }
-  }
+  });
   
-  // Add a "Play Notes" button if there are played notes
+  // If any played notes exist, add a "Play Notes" button
   if (playedNotesToPlay.length > 0) {
-    // Create a polyphonic synth for playing multiple notes
-    const polySynth = new tone.PolySynth(tone.Synth).toDestination();
+    const polySynth = new Tone.PolySynth(Tone.Synth).toDestination();
     
-    // Add button 
-    d3.select(svg)
+    d3.select("svg")
       .append("rect")
       .attr("x", FRETBOARD_LEFT + FRETBOARD_WIDTH - 100)
       .attr("y", FRETBOARD_TOP + FRETBOARD_HEIGHT + 50)
@@ -287,12 +261,10 @@ function drawPlayableFrets(strings, playedNotes) {
       .attr("stroke", "black")
       .attr("cursor", "pointer")
       .on("click", () => {
-        // Play all notes simultaneously
         polySynth.triggerAttackRelease(playedNotesToPlay, "4n");
       });
-    
-    // Add button label
-    d3.select(svg)
+      
+    d3.select("svg")
       .append("text")
       .attr("x", FRETBOARD_LEFT + FRETBOARD_WIDTH - 50)
       .attr("y", FRETBOARD_TOP + FRETBOARD_HEIGHT + 70)
@@ -302,7 +274,7 @@ function drawPlayableFrets(strings, playedNotes) {
       .attr("pointer-events", "none")
       .text("Play Notes");
     
-    d3.select(svg)
+    d3.select("svg")
       .append("text")
       .attr("x", FRETBOARD_LEFT)
       .attr("y", FRETBOARD_TOP + FRETBOARD_HEIGHT + 80)
@@ -312,32 +284,28 @@ function drawPlayableFrets(strings, playedNotes) {
   }
 }
 
-/**
- * Main viz function
+/*
+ * Main viz
  */
 function visualizeGuitar() {
-  // Make sure the SVG is sized appropriately
-  d3.select(svg)
+  // Size the SVG
+  d3.select("svg")
     .attr("width", SVG_WIDTH)
     .attr("height", SVG_HEIGHT);
     
-  // Get all the strings from the model
+  // Get all strings and played notes from the model
   let strings = String.atoms(true);
-  
-  // Get all played notes from the model
   const playedNotes = PlayedNote.atoms(true);
   
-  // Draw the basic fretboard
-strings = [...strings].sort((a, b) => a.stringPos._id - b.stringPos._id);
-
-// Draw the basic fretboard
-drawFretboard(strings);
+  // Sort strings in ascending order so that string 1 (E4) is at the top and string 6 (E2) is at the bottom
+  strings = [...strings].sort((a, b) => a.stringPos._id - b.stringPos._id);
   
-  // Draw playable frets, now incluting played notes
+  // Draw the fretboard and fretted markers
+  drawFretboard(strings);
   drawPlayableFrets(strings, playedNotes);
   
-  // Title for the visualization
-  d3.select(svg)
+  // Title and instructions
+  d3.select("svg")
     .append("text")
     .attr("x", SVG_WIDTH / 2)
     .attr("y", 50)
@@ -346,8 +314,7 @@ drawFretboard(strings);
     .attr("font-weight", "bold")
     .text("Guitar Fretboard Visualization");
     
-  // Instructions
-  d3.select(svg)
+  d3.select("svg")
     .append("text")
     .attr("x", FRETBOARD_LEFT)
     .attr("y", FRETBOARD_TOP + FRETBOARD_HEIGHT + 60)
@@ -357,5 +324,5 @@ drawFretboard(strings);
   console.log("Guitar visualization complete with", playedNotes.length, "played notes from model");
 }
 
-// Call the main visualization function
+// Run the visualization
 visualizeGuitar();
