@@ -12,9 +12,11 @@ This project models a guitar in standard tuning using Forge, representing the re
 
 These design choices can be seen on the neck of a guitar in our custom visualization and audio component. 
 
+Unfortunately, we could not get the PlayedNotes sig to work with the visualizer for some reason after extensive effort. As of now, a user must manually select notes to play rather than having a button to play some predefined notes.
+
 ## Signatures and Predicates
 
-- **Guitar**: Maps indices to strings on a guitar. 
+- **Guitar**: Maps indices to strings on a guitar. Wasn't necessary for the visualization but still helpful overall.
 - **String**: Models each string on the guitar at an index, and its associated intervals and fret positions.
 - **Interval**: Represents a half step between frets. 
 - **Wellformed Predicate**: Checks that each string has the proper number of frets and intervals.
